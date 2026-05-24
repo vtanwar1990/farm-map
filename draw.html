@@ -32,7 +32,7 @@
         .section-title { font-family: Arial, sans-serif; font-weight: bold; margin-bottom: 5px; color: #333; border-bottom: 2px solid #ccc; padding-bottom: 3px; }
         .point-entry { margin-bottom: 8px; transition: all 0.3s ease; }
         
-        /* --- CSS FOR CUSTOM NUMBERED PINS --- */
+        /* CSS FOR CUSTOM NUMBERED PINS */
         .corner-pin div, .sample-pin div {
             width: 24px; height: 24px; border-radius: 50%;
             color: white; font-family: Arial, sans-serif; font-weight: bold; font-size: 12px;
@@ -96,11 +96,46 @@
         });
         map.addControl(drawControl);
 
-        var sampleCounter = 0;
+        // --- NEW ARRAY TO STORE ACTIVE SAMPLES ---
+        var activeSamples = [];
+
+        // Function to re-render the numbers on the map and the dashboard text
+        function updateSamplesUI() {
+            var outputDiv = document.getElementById('sample-output');
+            
+            // If empty, show default message
+            if (activeSamples.length === 0) {
+                outputDiv.innerHTML = '<div class="section-title">Interior Samples</div><span style="color:#0078FF;">Click inside the yellow area to drop a numbered sample pin.</span>';
+                return;
+            }
+
+            var html = '<div class="section-title">Interior Samples</div>';
+
+            // Loop through the array, re-number the map pins, and rebuild the text list
+            activeSamples.forEach(function(sampleObj, index) {
+                var currentNum = index + 1; // 1, 2, 3...
+
+                // Update the visual number inside the red map pin
+                var updatedIcon = L.divIcon({
+                    className: 'sample-pin',
+                    html: `<div>${currentNum}</div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
+                });
+                sampleObj.marker.setIcon(updatedIcon);
+
+                // Add the clean entry to the dashboard string
+                html += `<div class="point-entry"><b>Sample ${currentNum}:</b><br>${sampleObj.lat.toFixed(6)}, ${sampleObj.lng.toFixed(6)}</div>`;
+            });
+
+            // Push the clean list to the dashboard
+            outputDiv.innerHTML = html;
+        }
+
 
         map.on(L.Draw.Event.CREATED, function (e) {
             drawnItems.clearLayers();
-            sampleCounter = 0; 
+            activeSamples = []; // Reset the samples memory when drawing a new field
             
             var layer = e.layer;
             drawnItems.addLayer(layer);
@@ -108,14 +143,14 @@
             var latlngs = layer.getLatLngs()[0];
             var cornerHtml = '<div class="section-title">Boundary Edges</div>';
             
-            // Loop through each corner and drop a NUMBERED black/white pin
+            // Corners setup
             latlngs.forEach(function(point, index) {
                 var cornerNum = index + 1;
                 var cornerIcon = L.divIcon({
                     className: 'corner-pin',
                     html: `<div>${cornerNum}</div>`,
                     iconSize: [28, 28],
-                    iconAnchor: [14, 14] // Centers the icon perfectly on the coordinate
+                    iconAnchor: [14, 14] 
                 });
                 
                 L.marker(point, {icon: cornerIcon}).addTo(drawnItems);
@@ -123,52 +158,41 @@
             });
             
             document.getElementById('corner-output').innerHTML = cornerHtml;
-            document.getElementById('sample-output').innerHTML = '<div class="section-title">Interior Samples</div><span style="color:#0078FF;">Click inside the yellow area to drop a numbered sample pin.</span>';
+            updateSamplesUI(); // Initialize the empty sample UI
 
             // Click listener for creating samples inside the field
             layer.on('click', function(clickEvent) {
-                sampleCounter++;
-                var currentSampleId = sampleCounter; // Save the ID for this specific pin
                 var sLat = clickEvent.latlng.lat;
                 var sLng = clickEvent.latlng.lng;
 
-                // Create a NUMBERED red pin
-                var sampleIcon = L.divIcon({
-                    className: 'sample-pin',
-                    html: `<div>${currentSampleId}</div>`,
-                    iconSize: [28, 28],
-                    iconAnchor: [14, 14]
-                });
-
-                var samplePin = L.marker(clickEvent.latlng, {icon: sampleIcon}).addTo(drawnItems);
-
-                // Setup the HTML for the dashboard
-                if (currentSampleId === 1) {
-                    document.getElementById('sample-output').innerHTML = '<div class="section-title">Interior Samples</div>';
-                }
+                // Create a basic red marker (the icon is immediately updated by the UI function)
+                var samplePin = L.marker(clickEvent.latlng).addTo(drawnItems);
                 
-                var sampleHtml = `<div class="point-entry" id="log-sample-${currentSampleId}"><b>Sample ${currentSampleId}:</b><br>${sLat.toFixed(6)}, ${sLng.toFixed(6)}</div>`;
-                document.getElementById('sample-output').innerHTML += sampleHtml;
-                
-                var container = document.getElementById('data-container');
-                container.scrollTop = container.scrollHeight;
+                // Store this pin's data in the memory array
+                var newSampleData = { marker: samplePin, lat: sLat, lng: sLng };
+                activeSamples.push(newSampleData);
 
                 // --- DELETE LOGIC ---
-                // If you click directly on the RED PIN, it deletes itself
                 samplePin.on('click', function(e) {
-                    L.DomEvent.stopPropagation(e); // Stop the map from thinking you clicked the yellow shape
+                    L.DomEvent.stopPropagation(e); // Prevent map from thinking you clicked the field
                     
-                    // Remove from map
-                    drawnItems.removeLayer(samplePin);
+                    drawnItems.removeLayer(samplePin); // Remove from map
                     
-                    // Cross it out in the dashboard list
-                    var logEntry = document.getElementById(`log-sample-${currentSampleId}`);
-                    if(logEntry) {
-                        logEntry.style.textDecoration = 'line-through';
-                        logEntry.style.color = '#aaa';
-                        logEntry.innerHTML = `<b>Sample ${currentSampleId}:</b> <span style="font-size:11px; color:red;">[Removed]</span>`;
-                    }
+                    // Remove from our memory array
+                    activeSamples = activeSamples.filter(function(item) {
+                        return item !== newSampleData;
+                    });
+                    
+                    // Trigger the auto-re-numbering function
+                    updateSamplesUI();
                 });
+
+                // Trigger the auto-re-numbering function after adding
+                updateSamplesUI();
+                
+                // Auto-scroll the list
+                var container = document.getElementById('data-container');
+                container.scrollTop = container.scrollHeight;
             });
         });
     </script>
