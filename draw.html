@@ -57,16 +57,19 @@
             <div class="section-title">Export Settings</div>
             <div class="config-row">Resolution: <select id="data-res"><option value="daily">Daily</option><option value="hourly">Hourly</option></select></div>
             <div class="config-row">Years: <input type="number" id="start-year" value="2021"> to <input type="number" id="end-year" value="2023"></div>
+            
+            <b>Select Parameters:</b>
             <div class="param-grid" id="param-selector">
                 <label><input type="checkbox" value="temperature_2m" checked> Temp (°F)</label>
                 <label><input type="checkbox" value="relative_humidity_2m" checked> Humidity (%)</label>
                 <label><input type="checkbox" value="precipitation" checked> Precip (in)</label>
-                <label><input type="checkbox" value="wind_speed_10m"> Wind Speed (mph)</label>
+                <label><input type="checkbox" value="wind_speed_10m"> Wind Speed</label>
                 <label><input type="checkbox" value="wind_direction_10m"> Wind Dir (°)</label>
-                <label><input type="checkbox" value="surface_pressure"> Pressure (hPa)</label>
-                <label><input type="checkbox" value="shortwave_radiation"> Solar Radiation</label>
-                <label><input type="checkbox" value="soil_temperature_0_to_7cm"> Soil Temp (0-7cm)</label>
+                <label><input type="checkbox" value="surface_pressure"> Pressure</label>
+                <label><input type="checkbox" value="shortwave_radiation"> Solar Rad</label>
+                <label><input type="checkbox" value="soil_temperature_0_to_7cm"> Soil Temp</label>
             </div>
+            
             <button class="export-btn" onclick="exportWeatherData()">📥 Download Multi-Sheet Excel</button>
             <div id="export-status" style="text-align:center; font-size:11px; margin-top:5px;"></div>
         </div>
@@ -89,7 +92,6 @@
         var activeSamples = [];
         
         function updateUI(corners = null) {
-            // Update Sample Points
             let sampleHtml = '<div class="section-title">Interior Samples</div>';
             activeSamples.forEach((s, idx) => {
                 s.marker.setIcon(L.divIcon({ className: 'sample-pin', html: `<div>${idx+1}</div>`, iconSize: [28,28] }));
@@ -97,12 +99,9 @@
             });
             document.getElementById('sample-output').innerHTML = sampleHtml || '<span style="color:gray;">No samples logged.</span>';
 
-            // Update Boundary Edges
             if (corners) {
                 let cornerHtml = '<div class="section-title">Boundary Edges</div>';
-                corners.forEach((c, idx) => {
-                    cornerHtml += `<div class="point-entry"><b>Corner ${idx+1}:</b> ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}</div>`;
-                });
+                corners.forEach((c, idx) => { cornerHtml += `<div class="point-entry"><b>Corner ${idx+1}:</b> ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}</div>`; });
                 document.getElementById('corner-output').innerHTML = cornerHtml;
             }
         }
@@ -111,12 +110,7 @@
             drawnItems.clearLayers(); activeSamples = [];
             let layer = e.layer; drawnItems.addLayer(layer);
             let latlngs = layer.getLatLngs()[0];
-            
-            // Re-adding Corner Pins
-            latlngs.forEach((point, idx) => {
-                L.marker(point, {icon: L.divIcon({ className: 'corner-pin', html: `<div>${idx+1}</div>`, iconSize: [28,28] })}).addTo(drawnItems);
-            });
-
+            latlngs.forEach((point, idx) => { L.marker(point, {icon: L.divIcon({ className: 'corner-pin', html: `<div>${idx+1}</div>`, iconSize: [28,28] })}).addTo(drawnItems); });
             layer.on('click', function(ev) {
                 let s = L.marker(ev.latlng).addTo(drawnItems);
                 let data = { marker: s, lat: ev.latlng.lat, lng: ev.latlng.lng };
