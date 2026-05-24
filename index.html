@@ -62,12 +62,13 @@
         }).addTo(map);
 
         // Define the farm boundary
+        // Define the farm boundary (Perfect Rectangle)
         var farmCoords = [
-            [-86.876892, 40.291644],
-            [-86.876892, 40.291656],
-            [-86.875458, 40.291656],
-            [-86.875458, 40.292186],
-            [-86.876892, 40.291644]
+            [-86.876892, 40.292186], // North-West Corner
+            [-86.875458, 40.292186], // North-East Corner
+            [-86.875458, 40.291644], // South-East Corner
+            [-86.876892, 40.291644], // South-West Corner
+            [-86.876892, 40.292186]  // Closes the rectangle back at NW
         ];
         var farmPolygon = turf.polygon([farmCoords]);
 
