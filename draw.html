@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Purdue Meigs - Interactive Draw Tool</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; }
+        #map { height: 100vh; width: 100vw; }
+        #dashboard {
+            position: absolute; top: 20px; right: 20px; z-index: 1000;
+            background: white; padding: 15px; border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2); width: 300px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="dashboard">
+        <h3>Define New Plot</h3>
+        <p>Use the toolbar on the left to draw a polygon or rectangle over your field.</p>
+        <p><strong>Captured Coordinates:</strong></p>
+        <textarea id="coord-output" rows="6" style="width:100%; font-size:12px;"></textarea>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+    <script>
+        var map = L.map('map').setView([40.2919, -86.8762], 18);
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        }).addTo(map);
+
+        // Drawing Layer
+        var drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        var drawControl = new L.Control.Draw({
+            edit: { featureGroup: drawnItems },
+            draw: { polygon: true, marker: false, polyline: false, circle: false, rectangle: true }
+        });
+        map.addControl(drawControl);
+
+        // Capture drawn coordinates
+        map.on(L.Draw.Event.CREATED, function (e) {
+            var layer = e.layer;
+            drawnItems.clearLayers(); // Only keep the latest one
+            drawnItems.addLayer(layer);
+            
+            var latlngs = layer.getLatLngs()[0]; // Extract corners
+            var coordList = latlngs.map(p => [p.lng.toFixed(6), p.lat.toFixed(6)]);
+            
+            document.getElementById('coord-output').value = JSON.stringify(coordList, null, 2);
+        });
+    </script>
+</body>
+</html>
