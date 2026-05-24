@@ -9,17 +9,19 @@
         body, html { margin: 0; padding: 0; height: 100%; }
         #map { height: 100vh; width: 100vw; }
         
-        /* Dashboard styling */
         #dashboard {
             position: absolute; top: 20px; right: 20px; z-index: 1000;
             background: white; padding: 15px; border-radius: 8px;
             box-shadow: 0 0 15px rgba(0,0,0,0.3); width: 300px;
         }
         
-        /* Move Search Bar to Top Center */
+        /* New precise positioning for the search bar */
         .leaflet-control-geocoder {
-            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-            z-index: 1000;
+            position: absolute !important;
+            top: 10px !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            margin-top: 0 !important;
         }
     </style>
 </head>
