@@ -58,10 +58,14 @@
             <div class="config-row">Resolution: <select id="data-res"><option value="daily">Daily</option><option value="hourly">Hourly</option></select></div>
             <div class="config-row">Years: <input type="number" id="start-year" value="2021"> to <input type="number" id="end-year" value="2023"></div>
             <div class="param-grid" id="param-selector">
-                <label><input type="checkbox" value="temperature_2m" checked> Temp</label>
-                <label><input type="checkbox" value="relative_humidity_2m" checked> Humidity</label>
-                <label><input type="checkbox" value="precipitation" checked> Precip</label>
-                <label><input type="checkbox" value="wind_speed_10m"> Wind Speed</label>
+                <label><input type="checkbox" value="temperature_2m" checked> Temp (°F)</label>
+                <label><input type="checkbox" value="relative_humidity_2m" checked> Humidity (%)</label>
+                <label><input type="checkbox" value="precipitation" checked> Precip (in)</label>
+                <label><input type="checkbox" value="wind_speed_10m"> Wind Speed (mph)</label>
+                <label><input type="checkbox" value="wind_direction_10m"> Wind Dir (°)</label>
+                <label><input type="checkbox" value="surface_pressure"> Pressure (hPa)</label>
+                <label><input type="checkbox" value="shortwave_radiation"> Solar Radiation</label>
+                <label><input type="checkbox" value="soil_temperature_0_to_7cm"> Soil Temp (0-7cm)</label>
             </div>
             <button class="export-btn" onclick="exportWeatherData()">📥 Download Multi-Sheet Excel</button>
             <div id="export-status" style="text-align:center; font-size:11px; margin-top:5px;"></div>
