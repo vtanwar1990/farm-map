@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Purdue Meigs A - Click to Select</title>
+    <!-- Load Leaflet Map Styles -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        /* Make the map take up the whole screen */
+        body, html { margin: 0; padding: 0; height: 100%; }
+        #map { height: 100vh; width: 100vw; }
+        
+        /* Style the floating dashboard */
+        #dashboard {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            font-family: Arial, sans-serif;
+            width: 250px;
+        }
+        .instruction {
+            font-size: 0.9em;
+            color: #555;
+            font-style: italic;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- The Floating Dashboard Box -->
+    <div id="dashboard">
+        <h3>Meigs A Dashboard</h3>
+        <p class="instruction">Click anywhere inside the green boundary to drop a pin.</p>
+        
+        <p><strong>Mouse Location (Hover):</strong><br><span id="mouse-coords">Hover over map...</span></p>
+        
+        <hr>
+        
+        <p><strong>Selected Target (Clicked):</strong><br><span id="clicked-coords">No location clicked yet</span></p>
+    </div>
+
+    <!-- The Map Container -->
+    <div id="map"></div>
+
+    <!-- Load Mapping Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // Initialize the map
+        var map = L.map('map').setView([40.2919, -86.8762], 18);
+
+        // Add satellite imagery
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        }).addTo(map);
+
+        // Define the farm boundary (The Perfect Rectangle)
+        var farmCoords = [
+            [-86.876892, 40.292186], // North-West Corner
+            [-86.875458, 40.292186], // North-East Corner
+            [-86.875458, 40.291644], // South-East Corner
+            [-86.876892, 40.291644], // South-West Corner
+            [-86.876892, 40.292186]  // Closes the rectangle
+        ];
+
+        // Draw the boundary on the map
+        var leafletCoords = farmCoords.map(coord => [coord[1], coord[0]]);
+        var farmLayer = L.polygon(leafletCoords, {
+            color: 'lime',
+            fillOpacity: 0.2,
+            weight: 3
+        }).addTo(map);
+
+        map.fitBounds(farmLayer.getBounds());
+
+        // Track the mouse movement for the hover effect
+        map.on('mousemove', function(e) {
+            var lat = e.latlng.lat.toFixed(6);
+            var lng = e.latlng.lng.toFixed(6);
+            document.getElementById('mouse-coords').innerText = lat + ", " + lng;
+        });
+
+        // Click-to-Select Logic
+        var currentMarker = null;
+
+        // We attach the click event directly to the green farm boundary. 
+        // This ensures the user must click INSIDE the plot to drop a pin.
+        farmLayer.on('click', function(e) {
+            var clickedLat = e.latlng.lat;
+            var clickedLng = e.latlng.lng;
+
+            // Remove the old marker if one exists
+            if (currentMarker) {
+                map.removeLayer(currentMarker);
+            }
+
+            // Drop a new marker exactly where the user clicked
+            currentMarker = L.marker([clickedLat, clickedLng]).addTo(map);
+            
+            // Update the dashboard text
+            document.getElementById('clicked-coords').innerText = 
+                clickedLat.toFixed(6) + " N, " + 
+                Math.abs(clickedLng).toFixed(6) + " W";
+        });
+    </script>
+</body>
+</html>
