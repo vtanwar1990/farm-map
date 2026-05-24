@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Purdue Meigs A - Click to Select</title>
-    <!-- Load Leaflet Map Styles -->
+    <title>Purdue Meigs A - Multi-Point Selector</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         /* Make the map take up the whole screen */
@@ -20,7 +19,11 @@
             border-radius: 8px;
             box-shadow: 0 0 15px rgba(0,0,0,0.2);
             font-family: Arial, sans-serif;
-            width: 250px;
+            width: 280px;
+            
+            /* Added so the box doesn't run off the screen if you click many points */
+            max-height: 70vh; 
+            overflow-y: auto; 
         }
         .instruction {
             font-size: 0.9em;
@@ -28,26 +31,47 @@
             font-style: italic;
             margin-bottom: 10px;
         }
+        
+        /* Style the list of recorded points */
+        .point-entry {
+            background: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+            padding: 8px;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            border-radius: 0 4px 4px 0;
+        }
+        
+        /* Make the numbers on the map look nice */
+        .leaflet-tooltip.number-label {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            font-weight: bold;
+            font-size: 14px;
+            border-radius: 50%;
+            padding: 4px 8px;
+        }
     </style>
 </head>
 <body>
 
-    <!-- The Floating Dashboard Box -->
     <div id="dashboard">
-        <h3>Meigs A Dashboard</h3>
-        <p class="instruction">Click anywhere inside the green boundary to drop a pin.</p>
+        <h3>Meigs A Survey Tool</h3>
+        <p class="instruction">Click inside the green boundary to log multiple checkpoints.</p>
         
-        <p><strong>Mouse Location (Hover):</strong><br><span id="mouse-coords">Hover over map...</span></p>
+        <p><strong>Hover Location:</strong><br><span id="mouse-coords">Hover over map...</span></p>
         
         <hr>
         
-        <p><strong>Selected Target (Clicked):</strong><br><span id="clicked-coords">No location clicked yet</span></p>
+        <p><strong>Recorded Checkpoints:</strong></p>
+        <div id="point-list">
+            <span id="empty-message" style="color:gray; font-size:0.9em;">No locations clicked yet.</span>
+        </div>
     </div>
 
-    <!-- The Map Container -->
     <div id="map"></div>
 
-    <!-- Load Mapping Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
@@ -59,13 +83,13 @@
             attribution: 'Tiles &copy; Esri'
         }).addTo(map);
 
-        // Define the farm boundary (The Perfect Rectangle)
+        // Define the farm boundary 
         var farmCoords = [
-            [-86.876892, 40.292186], // North-West Corner
-            [-86.875458, 40.292186], // North-East Corner
-            [-86.875458, 40.291644], // South-East Corner
-            [-86.876892, 40.291644], // South-West Corner
-            [-86.876892, 40.292186]  // Closes the rectangle
+            [-86.876892, 40.292186],
+            [-86.875458, 40.292186],
+            [-86.875458, 40.291644],
+            [-86.876892, 40.291644],
+            [-86.876892, 40.292186]
         ];
 
         // Draw the boundary on the map
@@ -85,27 +109,50 @@
             document.getElementById('mouse-coords').innerText = lat + ", " + lng;
         });
 
-        // Click-to-Select Logic
-        var currentMarker = null;
+        // ---------------------------------------------------------
+        // NEW LOGIC: Keep track of multiple points
+        // ---------------------------------------------------------
+        
+        var pointCounter = 0; // Starts at zero
 
-        // We attach the click event directly to the green farm boundary. 
-        // This ensures the user must click INSIDE the plot to drop a pin.
         farmLayer.on('click', function(e) {
+            pointCounter++; // Increase count by 1 every time you click
+            
             var clickedLat = e.latlng.lat;
             var clickedLng = e.latlng.lng;
 
-            // Remove the old marker if one exists
-            if (currentMarker) {
-                map.removeLayer(currentMarker);
+            // 1. Drop a new marker on the map
+            var newMarker = L.marker([clickedLat, clickedLng]).addTo(map);
+            
+            // 2. Attach a permanent numbered label to the marker
+            newMarker.bindTooltip(pointCounter.toString(), {
+                permanent: true, 
+                direction: 'right',
+                className: 'number-label',
+                offset: [10, 0] // Pushes the number slightly to the right of the pin
+            }).openTooltip();
+
+            // 3. Hide the "No locations clicked yet" message if it's the first click
+            if (pointCounter === 1) {
+                document.getElementById('empty-message').style.display = 'none';
             }
 
-            // Drop a new marker exactly where the user clicked
-            currentMarker = L.marker([clickedLat, clickedLng]).addTo(map);
+            // 4. Create a new text entry for the dashboard
+            var listContainer = document.getElementById('point-list');
+            var newEntry = document.createElement('div');
+            newEntry.className = 'point-entry';
             
-            // Update the dashboard text
-            document.getElementById('clicked-coords').innerText = 
-                clickedLat.toFixed(6) + " N, " + 
-                Math.abs(clickedLng).toFixed(6) + " W";
+            // Format the text inside the new entry
+            newEntry.innerHTML = `<strong>Point ${pointCounter}</strong><br>
+                                  Lat: ${clickedLat.toFixed(6)}<br>
+                                  Lon: ${clickedLng.toFixed(6)}`;
+            
+            // 5. Add the new entry to the bottom of the list
+            listContainer.appendChild(newEntry);
+            
+            // 6. Auto-scroll the dashboard list to the bottom so the newest point is always visible
+            var dashboard = document.getElementById('dashboard');
+            dashboard.scrollTop = dashboard.scrollHeight;
         });
     </script>
 </body>
