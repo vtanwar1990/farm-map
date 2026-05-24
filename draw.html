@@ -1,17 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Purdue Meigs - Interactive Draw & Search</title>
+    <title>Purdue Meigs - Survey Tool</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
     <style>
         body, html { margin: 0; padding: 0; height: 100%; }
         #map { height: 100vh; width: 100vw; }
+        
+        /* Dashboard styling */
         #dashboard {
-            position: absolute; top: 20px; right: 50px; z-index: 1000;
+            position: absolute; top: 20px; right: 20px; z-index: 1000;
             background: white; padding: 15px; border-radius: 8px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.2); width: 300px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.3); width: 300px;
+        }
+        
+        /* Move Search Bar to Top Center */
+        .leaflet-control-geocoder {
+            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+            z-index: 1000;
         }
     </style>
 </head>
@@ -19,8 +27,8 @@
 
     <div id="dashboard">
         <h3>Plot Navigator & Draw</h3>
-        <p>1. Use the <b>Search bar</b> on the map to find your site.<br>
-           2. Use the <b>Drawing tools</b> on the left to mark your boundary.</p>
+        <p>1. <b>Search</b> at top-center to find your site.<br>
+           2. <b>Draw</b> using the left toolbar.</p>
         <p><strong>Captured Coordinates:</strong></p>
         <textarea id="coord-output" rows="6" style="width:100%; font-size:12px;"></textarea>
     </div>
@@ -32,33 +40,31 @@
     <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
     <script>
-        var map = L.map('map').setView([40.2919, -86.8762], 18);
+        // Set maxZoom: 22 to unlock high-resolution satellite imagery
+        var map = L.map('map', { maxZoom: 22 }).setView([40.2919, -86.8762], 18);
+        
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles &copy; Esri'
+            attribution: 'Tiles &copy; Esri',
+            maxZoom: 22
         }).addTo(map);
 
-        // Add Search Bar
+        // Geocoder Search Bar
         L.Control.geocoder({ defaultMarkGeocode: true }).addTo(map);
 
-        // Drawing Layer
+        // Drawing Setup
         var drawnItems = new L.FeatureGroup();
         map.addLayer(drawnItems);
-
         var drawControl = new L.Control.Draw({
             edit: { featureGroup: drawnItems },
             draw: { polygon: true, marker: false, polyline: false, circle: false, rectangle: true }
         });
         map.addControl(drawControl);
 
-        // Capture coordinates
         map.on(L.Draw.Event.CREATED, function (e) {
-            var layer = e.layer;
             drawnItems.clearLayers();
-            drawnItems.addLayer(layer);
-            
-            var latlngs = layer.getLatLngs()[0];
+            drawnItems.addLayer(e.layer);
+            var latlngs = e.layer.getLatLngs()[0];
             var coordList = latlngs.map(p => [p.lng.toFixed(6), p.lat.toFixed(6)]);
-            
             document.getElementById('coord-output').value = JSON.stringify(coordList, null, 2);
         });
     </script>
