@@ -15,13 +15,14 @@
             box-shadow: 0 0 15px rgba(0,0,0,0.3); width: 300px;
         }
         
-        /* New precise positioning for the search bar */
+        /* Bulletproof Center Positioning */
         .leaflet-control-geocoder {
-            position: absolute !important;
-            top: 10px !important;
+            position: fixed !important;
+            top: 20px !important;
             left: 50% !important;
             transform: translateX(-50%) !important;
-            margin-top: 0 !important;
+            z-index: 9999 !important;
+            margin: 0 !important;
         }
     </style>
 </head>
@@ -42,7 +43,6 @@
     <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
     <script>
-        // Set maxZoom: 22 to unlock high-resolution satellite imagery
         var map = L.map('map', { maxZoom: 22 }).setView([40.2919, -86.8762], 18);
         
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -50,15 +50,23 @@
             maxZoom: 22
         }).addTo(map);
 
-        // Geocoder Search Bar
-        L.Control.geocoder({ defaultMarkGeocode: true }).addTo(map);
+        // Initialize on the left so it doesn't fight the dashboard, then CSS centers it
+        L.Control.geocoder({ 
+            defaultMarkGeocode: true,
+            position: 'topleft' 
+        }).addTo(map);
 
-        // Drawing Setup
         var drawnItems = new L.FeatureGroup();
         map.addLayer(drawnItems);
+        
+        // Yellow, high-visibility shapes
         var drawControl = new L.Control.Draw({
             edit: { featureGroup: drawnItems },
-            draw: { polygon: true, marker: false, polyline: false, circle: false, rectangle: true }
+            draw: { 
+                polygon: { shapeOptions: { color: 'yellow', fillOpacity: 0.5 } },
+                rectangle: { shapeOptions: { color: 'yellow', fillOpacity: 0.5 } },
+                marker: false, polyline: false, circle: false 
+            }
         });
         map.addControl(drawControl);
 
