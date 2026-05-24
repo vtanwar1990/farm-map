@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Purdue Meigs A - Multi-Point Selector</title>
+    <title>Purdue Meigs A - Environmental Surveyor</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        /* Make the map take up the whole screen */
         body, html { margin: 0; padding: 0; height: 100%; }
         #map { height: 100vh; width: 100vw; }
         
@@ -19,10 +18,8 @@
             border-radius: 8px;
             box-shadow: 0 0 15px rgba(0,0,0,0.2);
             font-family: Arial, sans-serif;
-            width: 280px;
-            
-            /* Added so the box doesn't run off the screen if you click many points */
-            max-height: 70vh; 
+            width: 300px;
+            max-height: 80vh; 
             overflow-y: auto; 
         }
         .instruction {
@@ -32,23 +29,31 @@
             margin-bottom: 10px;
         }
         
-        /* Style the list of recorded points */
+        /* Style the list of recorded checkpoints */
         .point-entry {
             background: #f9f9f9;
-            border-left: 4px solid #4CAF50;
-            padding: 8px;
-            margin-bottom: 5px;
-            font-size: 0.9em;
+            border-left: 4px solid #0078FF;
+            padding: 10px;
+            margin-bottom: 8px;
+            font-size: 0.85em;
             border-radius: 0 4px 4px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         
-        /* Make the numbers on the map look nice */
+        .weather-data {
+            margin-top: 5px;
+            padding-top: 5px;
+            border-top: 1px dashed #ddd;
+            color: #333;
+        }
+        
+        /* Custom styling for the map pin numbers */
         .leaflet-tooltip.number-label {
-            background: #4CAF50;
+            background: #0078FF;
             color: white;
             border: none;
             font-weight: bold;
-            font-size: 14px;
+            font-size: 13px;
             border-radius: 50%;
             padding: 4px 8px;
         }
@@ -57,16 +62,16 @@
 <body>
 
     <div id="dashboard">
-        <h3>Meigs A Survey Tool</h3>
-        <p class="instruction">Click inside the green boundary to log multiple checkpoints.</p>
+        <h3>Meigs A Environmental Logs</h3>
+        <p class="instruction">Click inside the field to log a checkpoint and fetch live weather + soil moisture data.</p>
         
         <p><strong>Hover Location:</strong><br><span id="mouse-coords">Hover over map...</span></p>
         
         <hr>
         
-        <p><strong>Recorded Checkpoints:</strong></p>
+        <p><strong>Logged Checkpoints:</strong></p>
         <div id="point-list">
-            <span id="empty-message" style="color:gray; font-size:0.9em;">No locations clicked yet.</span>
+            <span id="empty-message" style="color:gray; font-size:0.9em;">No locations logged yet.</span>
         </div>
     </div>
 
@@ -83,7 +88,7 @@
             attribution: 'Tiles &copy; Esri'
         }).addTo(map);
 
-        // Define the farm boundary 
+        // Define the farm boundary (Rectangle)
         var farmCoords = [
             [-86.876892, 40.292186],
             [-86.875458, 40.292186],
@@ -95,9 +100,9 @@
         // Draw the boundary on the map
         var leafletCoords = farmCoords.map(coord => [coord[1], coord[0]]);
         var farmLayer = L.polygon(leafletCoords, {
-            color: 'lime',
-            fillOpacity: 0.2,
-            weight: 3
+            color: 'cyan',
+            fillOpacity: 0.1,
+            weight: 2
         }).addTo(map);
 
         map.fitBounds(farmLayer.getBounds());
@@ -109,50 +114,77 @@
             document.getElementById('mouse-coords').innerText = lat + ", " + lng;
         });
 
-        // ---------------------------------------------------------
-        // NEW LOGIC: Keep track of multiple points
-        // ---------------------------------------------------------
-        
-        var pointCounter = 0; // Starts at zero
+        var pointCounter = 0;
 
+        // Click-To-Sample Event Listener
         farmLayer.on('click', function(e) {
-            pointCounter++; // Increase count by 1 every time you click
+            pointCounter++;
             
             var clickedLat = e.latlng.lat;
             var clickedLng = e.latlng.lng;
 
-            // 1. Drop a new marker on the map
+            // 1. Drop a pin marker with a permanent number badge
             var newMarker = L.marker([clickedLat, clickedLng]).addTo(map);
-            
-            // 2. Attach a permanent numbered label to the marker
             newMarker.bindTooltip(pointCounter.toString(), {
                 permanent: true, 
                 direction: 'right',
                 className: 'number-label',
-                offset: [10, 0] // Pushes the number slightly to the right of the pin
+                offset: [10, 0]
             }).openTooltip();
 
-            // 3. Hide the "No locations clicked yet" message if it's the first click
+            // 2. Clear the placeholder text if it's the first click
             if (pointCounter === 1) {
                 document.getElementById('empty-message').style.display = 'none';
             }
 
-            // 4. Create a new text entry for the dashboard
+            // 3. Create a clean structural entry inside the dashboard box
             var listContainer = document.getElementById('point-list');
             var newEntry = document.createElement('div');
             newEntry.className = 'point-entry';
+            newEntry.id = "point-" + pointCounter; // Give it an ID so we can update it later
             
-            // Format the text inside the new entry
-            newEntry.innerHTML = `<strong>Point ${pointCounter}</strong><br>
-                                  Lat: ${clickedLat.toFixed(6)}<br>
-                                  Lon: ${clickedLng.toFixed(6)}`;
-            
-            // 5. Add the new entry to the bottom of the list
+            // Set up basic structural HTML with a loading indicator
+            newEntry.innerHTML = `
+                <strong>Checkpoint ${pointCounter}</strong><br>
+                <span style="color:#666;">GPS: ${clickedLat.toFixed(6)}, ${clickedLng.toFixed(6)}</span>
+                <div class="weather-data" id="weather-load-${pointCounter}">
+                    <span style="color:orange; font-style:italic;">Querying Open-Meteo API...</span>
+                </div>
+            `;
             listContainer.appendChild(newEntry);
-            
-            // 6. Auto-scroll the dashboard list to the bottom so the newest point is always visible
+
+            // Auto-scroll dashboard down
             var dashboard = document.getElementById('dashboard');
             dashboard.scrollTop = dashboard.scrollHeight;
+
+            // 4. API FETCH OPERATION: Get live data for this exact point
+            // Requests: Temp (2m), Rel. Humidity (2m), Wind Speed (10m), and Soil Moisture (0-7cm shallow layer)
+            var apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${clickedLat}&longitude=${clickedLng}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,soil_moisture_0_to_7cm&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    // Extract values safely from the JSON output
+                    var currentData = data.current;
+                    var temp = currentData.temperature_2m;
+                    var humidity = currentData.relative_humidity_2m;
+                    var wind = currentData.wind_speed_10m;
+                    var soilMoisture = currentData.soil_moisture_0_to_7cm;
+
+                    // 5. Replace the "Querying..." message with actual live numbers
+                    document.getElementById(`weather-load-${pointCounter}`).innerHTML = `
+                        <b>🌡️ Temp:</b> ${temp}°F<br>
+                        <b>💧 Humidity:</b> ${humidity}%<br>
+                        <b>💨 Wind Speed:</b> ${wind} mph<br>
+                        <b>🌱 Soil Moisture (0-7cm):</b> ${(soilMoisture * 100).toFixed(1)}% vol
+                    `;
+                })
+                .catch(error => {
+                    // Fail-safe printout if the internet stalls or API drops
+                    console.error("API error:", error);
+                    document.getElementById(`weather-load-${pointCounter}`).innerHTML = 
+                        `<span style="color:red;">Failed to retrieve atmospheric data.</span>`;
+                });
         });
     </script>
 </body>
