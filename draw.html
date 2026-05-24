@@ -83,18 +83,36 @@
         new L.Control.Draw({ edit: { featureGroup: drawnItems }, draw: { polygon: { shapeOptions: { color: 'yellow', fillOpacity: 0.4 } }, rectangle: { shapeOptions: { color: 'yellow', fillOpacity: 0.4 } }, marker: false, polyline: false, circle: false } }).addTo(map);
 
         var activeSamples = [];
-        function updateUI() {
-            let html = '<div class="section-title">Interior Samples</div>';
+        
+        function updateUI(corners = null) {
+            // Update Sample Points
+            let sampleHtml = '<div class="section-title">Interior Samples</div>';
             activeSamples.forEach((s, idx) => {
                 s.marker.setIcon(L.divIcon({ className: 'sample-pin', html: `<div>${idx+1}</div>`, iconSize: [28,28] }));
-                html += `<div class="point-entry"><b>Sample ${idx+1}:</b> ${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}</div>`;
+                sampleHtml += `<div class="point-entry"><b>Sample ${idx+1}:</b> ${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}</div>`;
             });
-            document.getElementById('sample-output').innerHTML = html || '<span style="color:gray;">No samples logged.</span>';
+            document.getElementById('sample-output').innerHTML = sampleHtml || '<span style="color:gray;">No samples logged.</span>';
+
+            // Update Boundary Edges
+            if (corners) {
+                let cornerHtml = '<div class="section-title">Boundary Edges</div>';
+                corners.forEach((c, idx) => {
+                    cornerHtml += `<div class="point-entry"><b>Corner ${idx+1}:</b> ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}</div>`;
+                });
+                document.getElementById('corner-output').innerHTML = cornerHtml;
+            }
         }
 
         map.on(L.Draw.Event.CREATED, function (e) {
             drawnItems.clearLayers(); activeSamples = [];
             let layer = e.layer; drawnItems.addLayer(layer);
+            let latlngs = layer.getLatLngs()[0];
+            
+            // Re-adding Corner Pins
+            latlngs.forEach((point, idx) => {
+                L.marker(point, {icon: L.divIcon({ className: 'corner-pin', html: `<div>${idx+1}</div>`, iconSize: [28,28] })}).addTo(drawnItems);
+            });
+
             layer.on('click', function(ev) {
                 let s = L.marker(ev.latlng).addTo(drawnItems);
                 let data = { marker: s, lat: ev.latlng.lat, lng: ev.latlng.lng };
@@ -102,7 +120,7 @@
                 s.on('click', (e) => { L.DomEvent.stopPropagation(e); drawnItems.removeLayer(s); activeSamples = activeSamples.filter(i => i !== data); updateUI(); });
                 updateUI();
             });
-            updateUI();
+            updateUI(latlngs);
         });
 
         async function exportWeatherData() {
