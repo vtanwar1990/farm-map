@@ -15,7 +15,7 @@
             box-shadow: 0 0 15px rgba(0,0,0,0.3); width: 300px;
         }
         
-        /* Bulletproof Center Positioning & Professional Width */
+        /* Bulletproof Center Positioning */
         .leaflet-control-geocoder {
             position: fixed !important;
             top: 20px !important;
@@ -26,6 +26,10 @@
             background-color: white !important;
             border-radius: 6px !important;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2) !important;
+            
+            /* Ensure the container stretches to fit the wide input */
+            width: auto !important;
+            min-width: 400px !important;
         }
         
         /* Make the actual typing area wider and the text larger */
@@ -62,10 +66,11 @@
             maxZoom: 22
         }).addTo(map);
 
-        // Initialize on the left so it doesn't fight the dashboard, then CSS centers it
+        // ADDED "collapsed: false" HERE
         L.Control.geocoder({ 
             defaultMarkGeocode: true,
-            position: 'topleft' 
+            position: 'topleft',
+            collapsed: false 
         }).addTo(map);
 
         var drawnItems = new L.FeatureGroup();
