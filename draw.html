@@ -5,6 +5,9 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
     <style>
         body, html { margin: 0; padding: 0; height: 100%; }
         #map { height: 100vh; width: 100vw; }
@@ -73,7 +76,7 @@
         </div>
 
         <div class="export-panel">
-            <div class="section-title" style="border:none; margin-bottom:10px;">Export Settings</div>
+            <div class="section-title" style="border:none; margin-bottom:10px;">Export Settings (.xlsx)</div>
             
             <div class="config-row">
                 <label>Resolution:</label>
@@ -105,7 +108,7 @@
                 </select>
             </div>
 
-            <button id="export-btn" class="export-btn" onclick="exportWeatherData()">📥 Export Seasonal Data</button>
+            <button id="export-btn" class="export-btn" onclick="exportWeatherData()">📥 Download Excel Workbook</button>
             <div id="export-status" style="font-size: 12px; color: gray; margin-top: 8px; text-align: center;"></div>
         </div>
     </div>
@@ -193,7 +196,7 @@
             });
         });
 
-        // --- UPGRADED: CUSTOM RANGE WEATHER EXPORT ---
+        // --- NEW LOGIC: TRUE MULTI-SHEET EXCEL EXPORT (SHEETJS) ---
         async function exportWeatherData() {
             if (activeSamples.length === 0) {
                 alert("Please click inside the yellow boundary to log at least one sample point before exporting.");
@@ -203,7 +206,6 @@
             var btn = document.getElementById('export-btn');
             var statusDiv = document.getElementById('export-status');
             
-            // Gather UI Inputs
             var res = document.getElementById('data-res').value;
             var startYear = parseInt(document.getElementById('start-year').value);
             var endYear = parseInt(document.getElementById('end-year').value);
@@ -217,23 +219,16 @@
             statusDiv.style.color = "gray";
 
             try {
-                var csvContent = "";
-                
-                // Determine headers based on resolution
-                if (res === 'daily') {
-                    csvContent = "Sample_ID,Latitude,Longitude,Date,Max_Temp_F,Min_Temp_F,Precipitation_inch\n";
-                } else {
-                    csvContent = "Sample_ID,Latitude,Longitude,Date_Time,Temp_F,Relative_Humidity_Pct,Precipitation_inch\n";
-                }
+                // Initialize a new real Excel Workbook
+                var workbook = XLSX.utils.book_new();
 
-                // Loop through all points
+                // Loop through every red point on the map
                 for (let i = 0; i < activeSamples.length; i++) {
                     let sample = activeSamples[i];
                     let sampleId = i + 1;
                     
                     statusDiv.innerText = `Fetching ${res} data for Sample ${sampleId} of ${activeSamples.length}...`;
 
-                    // Construct API URL
                     let url = `https://archive-api.open-meteo.com/v1/archive?latitude=${sample.lat}&longitude=${sample.lng}&start_date=${startYear}-01-01&end_date=${endYear}-12-31`;
                     
                     if (res === 'daily') {
@@ -246,46 +241,59 @@
                     let response = await fetch(url);
                     let data = await response.json();
 
-                    // Parse JSON and strictly filter by the selected Months
                     let timeArray = res === 'daily' ? data.daily.time : data.hourly.time;
+                    let sheetData = []; // This will hold all rows for THIS specific sheet/sample
                     
                     if (timeArray) {
                         for (let j = 0; j < timeArray.length; j++) {
-                            // Extract month strictly from the text string (YYYY-MM-DD...)
-                            let dateStr = timeArray[j];
-                            let monthStr = dateStr.substring(5, 7);
-                            let monthNum = parseInt(monthStr, 10);
+                            
+                            // SPLITTING DATE AND TIME
+                            // Hourly API returns "YYYY-MM-DDTHH:MM"
+                            // Daily API returns "YYYY-MM-DD"
+                            let rawTimeStr = timeArray[j];
+                            let splitParts = rawTimeStr.split("T");
+                            let datePart = splitParts[0]; // Always "YYYY-MM-DD"
+                            let timePart = splitParts.length > 1 ? splitParts[1] : ""; // "HH:MM" if hourly, blank if daily
+                            
+                            let monthNum = parseInt(datePart.substring(5, 7), 10);
 
-                            // Apply our Custom Filter (e.g., April to October)
+                            // Filter by active season
                             if (monthNum >= startMonth && monthNum <= endMonth) {
                                 
-                                if (res === 'daily') {
-                                    let tMax = data.daily.temperature_2m_max[j] !== null ? data.daily.temperature_2m_max[j] : "";
-                                    let tMin = data.daily.temperature_2m_min[j] !== null ? data.daily.temperature_2m_min[j] : "";
-                                    let p = data.daily.precipitation_sum[j] !== null ? data.daily.precipitation_sum[j] : "";
-                                    csvContent += `${sampleId},${sample.lat},${sample.lng},${dateStr},${tMax},${tMin},${p}\n`;
+                                // Build the clean object based on user resolution
+                                let rowObject = {};
+                                
+                                if (res === 'hourly') {
+                                    rowObject["Date"] = datePart;
+                                    rowObject["Time"] = timePart;
+                                    rowObject["Temp (F)"] = data.hourly.temperature_2m[j] !== null ? data.hourly.temperature_2m[j] : "";
+                                    rowObject["Relative Humidity (%)"] = data.hourly.relative_humidity_2m[j] !== null ? data.hourly.relative_humidity_2m[j] : "";
+                                    rowObject["Precipitation (inch)"] = data.hourly.precipitation[j] !== null ? data.hourly.precipitation[j] : "";
                                 } else {
-                                    let temp = data.hourly.temperature_2m[j] !== null ? data.hourly.temperature_2m[j] : "";
-                                    let hum = data.hourly.relative_humidity_2m[j] !== null ? data.hourly.relative_humidity_2m[j] : "";
-                                    let p = data.hourly.precipitation[j] !== null ? data.hourly.precipitation[j] : "";
-                                    csvContent += `${sampleId},${sample.lat},${sample.lng},${dateStr},${temp},${hum},${p}\n`;
+                                    // Daily data has no time of day
+                                    rowObject["Date"] = datePart;
+                                    rowObject["Max Temp (F)"] = data.daily.temperature_2m_max[j] !== null ? data.daily.temperature_2m_max[j] : "";
+                                    rowObject["Min Temp (F)"] = data.daily.temperature_2m_min[j] !== null ? data.daily.temperature_2m_min[j] : "";
+                                    rowObject["Precipitation (inch)"] = data.daily.precipitation_sum[j] !== null ? data.daily.precipitation_sum[j] : "";
                                 }
+                                
+                                sheetData.push(rowObject);
                             }
                         }
                     }
+                    
+                    // Convert the data array into a formatted Excel sheet
+                    let worksheet = XLSX.utils.json_to_sheet(sheetData);
+                    
+                    // Add this sheet to the workbook, named "Sample X"
+                    XLSX.utils.book_append_sheet(workbook, worksheet, `Sample ${sampleId}`);
                 }
 
-                statusDiv.innerText = "Building Excel file...";
+                statusDiv.innerText = "Building multi-sheet Excel file...";
 
-                var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                var link = document.createElement("a");
-                var urlObj = URL.createObjectURL(blob);
-                link.setAttribute("href", urlObj);
-                link.setAttribute("download", `Meigs_Farm_${startYear}-${endYear}_Weather.csv`);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                // Generate and download the true .xlsx file
+                let fileName = `Meigs_Farm_${startYear}-${endYear}_Weather.xlsx`;
+                XLSX.writeFile(workbook, fileName);
 
                 statusDiv.style.color = "green";
                 statusDiv.innerText = "Download complete!";
