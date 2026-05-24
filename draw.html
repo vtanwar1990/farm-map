@@ -15,7 +15,7 @@
             box-shadow: 0 0 15px rgba(0,0,0,0.3); width: 300px;
         }
         
-        /* Bulletproof Center Positioning */
+        /* Bulletproof Center Positioning & Professional Width */
         .leaflet-control-geocoder {
             position: fixed !important;
             top: 20px !important;
@@ -23,6 +23,18 @@
             transform: translateX(-50%) !important;
             z-index: 9999 !important;
             margin: 0 !important;
+            background-color: white !important;
+            border-radius: 6px !important;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2) !important;
+        }
+        
+        /* Make the actual typing area wider and the text larger */
+        .leaflet-control-geocoder-form input {
+            width: 400px !important; 
+            font-size: 15px !important;
+            padding: 10px 15px !important;
+            border: none !important;
+            border-radius: 6px !important;
         }
     </style>
 </head>
