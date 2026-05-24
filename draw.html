@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Purdue Meigs - Survey Tool</title>
+    <title>Purdue Meigs - Advanced Survey Dashboard</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
@@ -12,44 +12,58 @@
         #dashboard {
             position: absolute; top: 20px; right: 20px; z-index: 1000;
             background: white; padding: 15px; border-radius: 8px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.3); width: 300px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.3); width: 320px;
+            max-height: 85vh; display: flex; flex-direction: column;
         }
         
-        /* Bulletproof Center Positioning */
+        /* Search Bar Styling */
         .leaflet-control-geocoder {
-            position: fixed !important;
-            top: 20px !important;
-            left: 50% !important;
-            transform: translateX(-50%) !important;
-            z-index: 9999 !important;
-            margin: 0 !important;
-            background-color: white !important;
-            border-radius: 6px !important;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2) !important;
-            
-            /* Ensure the container stretches to fit the wide input */
-            width: auto !important;
-            min-width: 400px !important;
+            position: fixed !important; top: 20px !important; left: 50% !important;
+            transform: translateX(-50%) !important; z-index: 9999 !important; margin: 0 !important;
+            background-color: white !important; border-radius: 6px !important;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2) !important; width: auto !important; min-width: 400px !important;
         }
-        
-        /* Make the actual typing area wider and the text larger */
         .leaflet-control-geocoder-form input {
-            width: 400px !important; 
-            font-size: 15px !important;
-            padding: 10px 15px !important;
-            border: none !important;
-            border-radius: 6px !important;
+            width: 400px !important; font-size: 15px !important; padding: 10px 15px !important;
+            border: none !important; border-radius: 6px !important;
         }
+
+        /* Styling for the new data output sections */
+        #data-container {
+            overflow-y: auto; flex-grow: 1; margin-top: 10px; padding-right: 5px;
+        }
+        .data-section {
+            background: #f9f9f9; padding: 10px; border-radius: 4px; margin-bottom: 10px;
+            font-size: 13px; font-family: monospace; border: 1px solid #ddd;
+        }
+        .section-title {
+            font-family: Arial, sans-serif; font-weight: bold; margin-bottom: 5px; color: #333;
+            border-bottom: 2px solid #ccc; padding-bottom: 3px;
+        }
+        .point-entry { margin-bottom: 4px; }
     </style>
 </head>
 <body>
 
     <div id="dashboard">
-        <h3>Plot Navigator & Draw</h3>
-        <p>1. <b>Search</b> at top-center to find your site.<br>
-           2. <b>Draw</b> using the left toolbar.</p>
-        <p><strong>Captured Coordinates:</strong></p>
-        <textarea id="coord-output" rows="6" style="width:100%; font-size:12px;"></textarea>
+        <h3 style="margin-top:0; margin-bottom: 10px; font-family: Arial, sans-serif;">Plot Navigator & Draw</h3>
+        <p style="font-family: Arial, sans-serif; font-size: 14px; margin-top:0;">
+           1. <b>Search</b> at top-center to locate your field.<br>
+           2. <b>Draw</b> your boundary using the left toolbar.<br>
+           3. <b>Click</b> inside the yellow shape to log samples.
+        </p>
+        
+        <div id="data-container">
+            <div class="data-section" id="corner-output">
+                <div class="section-title">Boundary Edges</div>
+                <span style="color:gray;">Draw a shape to log corners...</span>
+            </div>
+            
+            <div class="data-section" id="sample-output">
+                <div class="section-title">Interior Samples</div>
+                <span style="color:gray;">Draw a shape first...</span>
+            </div>
+        </div>
     </div>
 
     <div id="map"></div>
@@ -66,7 +80,6 @@
             maxZoom: 22
         }).addTo(map);
 
-        // ADDED "collapsed: false" HERE
         L.Control.geocoder({ 
             defaultMarkGeocode: true,
             position: 'topleft',
@@ -76,23 +89,71 @@
         var drawnItems = new L.FeatureGroup();
         map.addLayer(drawnItems);
         
-        // Yellow, high-visibility shapes
         var drawControl = new L.Control.Draw({
             edit: { featureGroup: drawnItems },
             draw: { 
-                polygon: { shapeOptions: { color: 'yellow', fillOpacity: 0.5 } },
-                rectangle: { shapeOptions: { color: 'yellow', fillOpacity: 0.5 } },
+                polygon: { shapeOptions: { color: 'yellow', fillOpacity: 0.4, weight: 3 } },
+                rectangle: { shapeOptions: { color: 'yellow', fillOpacity: 0.4, weight: 3 } },
                 marker: false, polyline: false, circle: false 
             }
         });
         map.addControl(drawControl);
 
+        // Counter for sample clicks
+        var sampleCounter = 0;
+
         map.on(L.Draw.Event.CREATED, function (e) {
+            // Clear old drawings and reset counter
             drawnItems.clearLayers();
-            drawnItems.addLayer(e.layer);
-            var latlngs = e.layer.getLatLngs()[0];
-            var coordList = latlngs.map(p => [p.lng.toFixed(6), p.lat.toFixed(6)]);
-            document.getElementById('coord-output').value = JSON.stringify(coordList, null, 2);
+            sampleCounter = 0; 
+            
+            var layer = e.layer;
+            drawnItems.addLayer(layer);
+            
+            var latlngs = layer.getLatLngs()[0];
+            
+            // 1 & 2. Format Boundary Corners and Add Edge Pins
+            var cornerHtml = '<div class="section-title">Boundary Edges</div>';
+            
+            latlngs.forEach(function(point, index) {
+                // Drop a White pin with black border on each corner
+                var cornerPin = L.circleMarker(point, {
+                    color: 'black', weight: 2, fillColor: 'white', fillOpacity: 1, radius: 5
+                }).addTo(drawnItems);
+                
+                // Add clean text to the dashboard
+                cornerHtml += `<div class="point-entry"><b>Corner ${index + 1}:</b><br>${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}</div>`;
+            });
+            
+            document.getElementById('corner-output').innerHTML = cornerHtml;
+            document.getElementById('sample-output').innerHTML = '<div class="section-title">Interior Samples</div><span style="color:#0078FF;">Click inside the yellow area to drop a sample pin.</span>';
+
+            // 3. Add click listener to the drawn shape for Interior Samples
+            layer.on('click', function(clickEvent) {
+                sampleCounter++;
+                var sLat = clickEvent.latlng.lat;
+                var sLng = clickEvent.latlng.lng;
+
+                // Drop a Red pin for interior samples
+                var samplePin = L.circleMarker(clickEvent.latlng, {
+                    color: 'darkred', weight: 1, fillColor: 'red', fillOpacity: 0.9, radius: 6
+                }).addTo(drawnItems);
+
+                // Create a clean text entry
+                var sampleHtml = `<div class="point-entry"><b>Sample ${sampleCounter}:</b><br>${sLat.toFixed(6)}, ${sLng.toFixed(6)}</div>`;
+                
+                // If it's the first click, clear the helper text
+                if (sampleCounter === 1) {
+                    document.getElementById('sample-output').innerHTML = '<div class="section-title">Interior Samples</div>';
+                }
+                
+                // Append the new sample text to the dashboard list
+                document.getElementById('sample-output').innerHTML += sampleHtml;
+                
+                // Auto-scroll to bottom of the data container
+                var container = document.getElementById('data-container');
+                container.scrollTop = container.scrollHeight;
+            });
         });
     </script>
 </body>
