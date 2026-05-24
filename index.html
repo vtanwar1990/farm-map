@@ -1,15 +1,119 @@
-HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Purdue Meigs A Farm</title>
+    <!-- Load Leaflet Map Styles -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        /* Make the map take up the whole screen */
+        body, html { margin: 0; padding: 0; height: 100%; }
+        #map { height: 100vh; width: 100vw; }
+        
+        /* Style the floating dashboard */
+        #dashboard {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            font-family: Arial, sans-serif;
+            width: 250px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        button:hover { background: #45a049; }
+    </style>
+</head>
+<body>
 
-Purdue Meigs A Farm
-    
-    
-    
+    <!-- The Floating Dashboard Box -->
+    <div id="dashboard">
+        <h3>Meigs A Dashboard</h3>
+        <p><strong>Mouse Location:</strong><br><span id="mouse-coords">Hover over map...</span></p>
+        <p><strong>Random Point:</strong><br><span id="random-coords">None generated yet</span></p>
+        <button onclick="generateRandomPoint()">Generate Target</button>
+    </div>
 
+    <!-- The Map Container -->
+    <div id="map"></div>
 
+    <!-- Load Mapping Scripts (Leaflet & Turf.js) -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
 
-    
-    
-        Meigs A Dashboard
-        Mouse Location:Hover over map...
-        Random Point:None generated yet
-        Generate Target
+    <script>
+        // Initialize the map
+        var map = L.map('map').setView([40.2919, -86.8762], 18);
+
+        // Add satellite imagery
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        }).addTo(map);
+
+        // Define the farm boundary
+        var farmCoords = [
+            [-86.876892, 40.291644],
+            [-86.876892, 40.291656],
+            [-86.875458, 40.291656],
+            [-86.875458, 40.292186],
+            [-86.876892, 40.291644]
+        ];
+        var farmPolygon = turf.polygon([farmCoords]);
+
+        // Draw the boundary on the map
+        var leafletCoords = farmCoords.map(coord => [coord[1], coord[0]]);
+        var farmLayer = L.polygon(leafletCoords, {
+            color: 'lime',
+            fillOpacity: 0.2,
+            weight: 3
+        }).addTo(map);
+
+        map.fitBounds(farmLayer.getBounds());
+
+        // Track the mouse movement
+        map.on('mousemove', function(e) {
+            var lat = e.latlng.lat.toFixed(6);
+            var lng = e.latlng.lng.toFixed(6);
+            document.getElementById('mouse-coords').innerText = lat + ", " + lng;
+        });
+
+        // Generate Random Point Logic
+        var currentMarker = null;
+
+        function generateRandomPoint() {
+            var bounds = turf.bbox(farmPolygon); 
+            var isInside = false;
+            var randomPt;
+
+            while (!isInside) {
+                var randomLng = bounds[0] + Math.random() * (bounds[2] - bounds[0]);
+                var randomLat = bounds[1] + Math.random() * (bounds[3] - bounds[1]);
+                
+                randomPt = turf.point([randomLng, randomLat]);
+                isInside = turf.booleanPointInPolygon(randomPt, farmPolygon);
+            }
+
+            if (currentMarker) {
+                map.removeLayer(currentMarker);
+            }
+
+            currentMarker = L.marker([randomPt.geometry.coordinates[1], randomPt.geometry.coordinates[0]]).addTo(map);
+            
+            document.getElementById('random-coords').innerText = 
+                randomPt.geometry.coordinates[1].toFixed(6) + " N, " + 
+                Math.abs(randomPt.geometry.coordinates[0]).toFixed(6) + " W";
+        }
+    </script>
+</body>
+</html>
