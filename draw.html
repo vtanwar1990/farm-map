@@ -16,7 +16,6 @@
             max-height: 85vh; display: flex; flex-direction: column;
         }
         
-        /* Search Bar Styling */
         .leaflet-control-geocoder {
             position: fixed !important; top: 20px !important; left: 50% !important;
             transform: translateX(-50%) !important; z-index: 9999 !important; margin: 0 !important;
@@ -28,19 +27,21 @@
             border: none !important; border-radius: 6px !important;
         }
 
-        /* Styling for the new data output sections */
-        #data-container {
-            overflow-y: auto; flex-grow: 1; margin-top: 10px; padding-right: 5px;
+        #data-container { overflow-y: auto; flex-grow: 1; margin-top: 10px; padding-right: 5px; }
+        .data-section { background: #f9f9f9; padding: 10px; border-radius: 4px; margin-bottom: 10px; font-size: 13px; font-family: monospace; border: 1px solid #ddd; }
+        .section-title { font-family: Arial, sans-serif; font-weight: bold; margin-bottom: 5px; color: #333; border-bottom: 2px solid #ccc; padding-bottom: 3px; }
+        .point-entry { margin-bottom: 8px; transition: all 0.3s ease; }
+        
+        /* --- CSS FOR CUSTOM NUMBERED PINS --- */
+        .corner-pin div, .sample-pin div {
+            width: 24px; height: 24px; border-radius: 50%;
+            color: white; font-family: Arial, sans-serif; font-weight: bold; font-size: 12px;
+            display: flex; justify-content: center; align-items: center;
+            border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
         }
-        .data-section {
-            background: #f9f9f9; padding: 10px; border-radius: 4px; margin-bottom: 10px;
-            font-size: 13px; font-family: monospace; border: 1px solid #ddd;
-        }
-        .section-title {
-            font-family: Arial, sans-serif; font-weight: bold; margin-bottom: 5px; color: #333;
-            border-bottom: 2px solid #ccc; padding-bottom: 3px;
-        }
-        .point-entry { margin-bottom: 4px; }
+        .corner-pin div { background-color: black; }
+        .sample-pin div { background-color: red; cursor: pointer; }
+        .sample-pin div:hover { background-color: darkred; transform: scale(1.1); }
     </style>
 </head>
 <body>
@@ -50,7 +51,7 @@
         <p style="font-family: Arial, sans-serif; font-size: 14px; margin-top:0;">
            1. <b>Search</b> at top-center to locate your field.<br>
            2. <b>Draw</b> your boundary using the left toolbar.<br>
-           3. <b>Click</b> inside the yellow shape to log samples.
+           3. <b>Click</b> inside to log a sample. <b>Click</b> a red pin to delete it.
         </p>
         
         <div id="data-container">
@@ -80,11 +81,7 @@
             maxZoom: 22
         }).addTo(map);
 
-        L.Control.geocoder({ 
-            defaultMarkGeocode: true,
-            position: 'topleft',
-            collapsed: false 
-        }).addTo(map);
+        L.Control.geocoder({ defaultMarkGeocode: true, position: 'topleft', collapsed: false }).addTo(map);
 
         var drawnItems = new L.FeatureGroup();
         map.addLayer(drawnItems);
@@ -99,11 +96,9 @@
         });
         map.addControl(drawControl);
 
-        // Counter for sample clicks
         var sampleCounter = 0;
 
         map.on(L.Draw.Event.CREATED, function (e) {
-            // Clear old drawings and reset counter
             drawnItems.clearLayers();
             sampleCounter = 0; 
             
@@ -111,48 +106,69 @@
             drawnItems.addLayer(layer);
             
             var latlngs = layer.getLatLngs()[0];
-            
-            // 1 & 2. Format Boundary Corners and Add Edge Pins
             var cornerHtml = '<div class="section-title">Boundary Edges</div>';
             
+            // Loop through each corner and drop a NUMBERED black/white pin
             latlngs.forEach(function(point, index) {
-                // Drop a White pin with black border on each corner
-                var cornerPin = L.circleMarker(point, {
-                    color: 'black', weight: 2, fillColor: 'white', fillOpacity: 1, radius: 5
-                }).addTo(drawnItems);
+                var cornerNum = index + 1;
+                var cornerIcon = L.divIcon({
+                    className: 'corner-pin',
+                    html: `<div>${cornerNum}</div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14] // Centers the icon perfectly on the coordinate
+                });
                 
-                // Add clean text to the dashboard
-                cornerHtml += `<div class="point-entry"><b>Corner ${index + 1}:</b><br>${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}</div>`;
+                L.marker(point, {icon: cornerIcon}).addTo(drawnItems);
+                cornerHtml += `<div class="point-entry"><b>Corner ${cornerNum}:</b><br>${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}</div>`;
             });
             
             document.getElementById('corner-output').innerHTML = cornerHtml;
-            document.getElementById('sample-output').innerHTML = '<div class="section-title">Interior Samples</div><span style="color:#0078FF;">Click inside the yellow area to drop a sample pin.</span>';
+            document.getElementById('sample-output').innerHTML = '<div class="section-title">Interior Samples</div><span style="color:#0078FF;">Click inside the yellow area to drop a numbered sample pin.</span>';
 
-            // 3. Add click listener to the drawn shape for Interior Samples
+            // Click listener for creating samples inside the field
             layer.on('click', function(clickEvent) {
                 sampleCounter++;
+                var currentSampleId = sampleCounter; // Save the ID for this specific pin
                 var sLat = clickEvent.latlng.lat;
                 var sLng = clickEvent.latlng.lng;
 
-                // Drop a Red pin for interior samples
-                var samplePin = L.circleMarker(clickEvent.latlng, {
-                    color: 'darkred', weight: 1, fillColor: 'red', fillOpacity: 0.9, radius: 6
-                }).addTo(drawnItems);
+                // Create a NUMBERED red pin
+                var sampleIcon = L.divIcon({
+                    className: 'sample-pin',
+                    html: `<div>${currentSampleId}</div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
+                });
 
-                // Create a clean text entry
-                var sampleHtml = `<div class="point-entry"><b>Sample ${sampleCounter}:</b><br>${sLat.toFixed(6)}, ${sLng.toFixed(6)}</div>`;
-                
-                // If it's the first click, clear the helper text
-                if (sampleCounter === 1) {
+                var samplePin = L.marker(clickEvent.latlng, {icon: sampleIcon}).addTo(drawnItems);
+
+                // Setup the HTML for the dashboard
+                if (currentSampleId === 1) {
                     document.getElementById('sample-output').innerHTML = '<div class="section-title">Interior Samples</div>';
                 }
                 
-                // Append the new sample text to the dashboard list
+                var sampleHtml = `<div class="point-entry" id="log-sample-${currentSampleId}"><b>Sample ${currentSampleId}:</b><br>${sLat.toFixed(6)}, ${sLng.toFixed(6)}</div>`;
                 document.getElementById('sample-output').innerHTML += sampleHtml;
                 
-                // Auto-scroll to bottom of the data container
                 var container = document.getElementById('data-container');
                 container.scrollTop = container.scrollHeight;
+
+                // --- DELETE LOGIC ---
+                // If you click directly on the RED PIN, it deletes itself
+                samplePin.on('click', function(e) {
+                    L.DomEvent.stopPropagation(e); // Stop the map from thinking you clicked the yellow shape
+                    
+                    // Remove from map
+                    drawnItems.removeLayer(samplePin);
+                    
+                    // Cross it out in the dashboard list
+                    var logEntry = document.getElementById(`log-sample-${currentSampleId}`);
+                    if(logEntry) {
+                        logEntry.style.textDecoration = 'line-through';
+                        logEntry.style.color = '#aaa';
+                        logEntry.innerHTML = `<b>Sample ${currentSampleId}:</b> <span style="font-size:11px; color:red;">[Removed]</span>`;
+                    }
+                });
             });
         });
     </script>
